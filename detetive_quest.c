@@ -1,12 +1,12 @@
 // ============================================================================
-//         PROJETO DETECTIVE QUEST - DESAFIO DE CÓDIGO (NÍVEL NOVATO)
+//         PROJETO DETECTIVE QUEST - DESAFIO DE CÓDIGO (NÍVEL AVENTUREIRO)
 // ============================================================================
 //
 // OBJETIVOS (VERSÃO FINAL):
-// - Implementar um mapa interativo de uma mansão utilizando árvore binária.
-// - Permitir navegação a partir do Hall de Entrada, escolhendo esquerda/direita.
-// - Exibir o nome de cada sala visitada até chegar a um nó-folha.
-// - Garantir legibilidade, clareza e usabilidade na exploração.
+// - Integrar a árvore binária da mansão com uma BST de pistas.
+// - Associar uma pista a cada cômodo e coletá-las durante a exploração.
+// - Inserir automaticamente as pistas encontradas na BST em ordem alfabética.
+// - Exibir todas as pistas coletadas ao final da jornada.
 //
 // ============================================================================
 // AUTOR: Diego Bloise
@@ -25,39 +25,50 @@
 #include <locale.h>
 
 // ============================================================================
-//                            ESTRUTURA DE DADOS
+//                            ESTRUTURAS DE DADOS
 // ============================================================================
 
 /**
  * @struct Sala
  * @brief Representa um cômodo da mansão (nó da árvore binária).
  *
- * Cada sala possui um nome e dois caminhos possíveis: esquerda e direita,
- * representando os cômodos adjacentes. O Hall de entrada é a raiz da árvore.
+ * Cada sala contém um nome, uma pista (opcional) e referências
+ * para as salas à esquerda e à direita.
  */
 typedef struct Sala {
-    char nome[50];           /**< Nome da sala */
+    char nome[50];           /**< Nome do cômodo */
+    char pista[100];         /**< Pista associada ao cômodo (opcional) */
     struct Sala* esquerda;   /**< Ponteiro para a sala à esquerda */
     struct Sala* direita;    /**< Ponteiro para a sala à direita */
 } Sala;
 
+/**
+ * @struct PistaNode
+ * @brief Representa um nó da árvore BST de pistas.
+ *
+ * Cada nó armazena uma pista e seus ponteiros esquerdo e direito,
+ * permitindo a organização alfabética automática.
+ */
+typedef struct PistaNode {
+    char pista[100];             /**< Texto da pista */
+    struct PistaNode* esquerda;  /**< Ponteiro para a pista menor */
+    struct PistaNode* direita;   /**< Ponteiro para a pista maior */
+} PistaNode;
+
 // ============================================================================
-//                          PROTÓTIPOS DAS FUNÇÕES
+//                           PROTÓTIPOS DE FUNÇÕES
 // ============================================================================
 
-/** @brief Cria dinamicamente uma nova sala com o nome especificado. */
-Sala* criarSala(const char* nome);
+// Funções principais
+Sala* criarSala(const char* nome, const char* pista);
+PistaNode* inserirPista(PistaNode* raiz, const char* pista);
+void explorarSalasComPistas(Sala* atual, PistaNode** raizPistas);
+void exibirPistas(PistaNode* raiz);
 
-/** @brief Explora as salas da mansão interativamente a partir de uma sala. */
-void explorarSalas(Sala* atual);
-
-/** @brief Libera toda a memória alocada pela árvore de salas. */
+// Funções utilitárias
 void liberarMansao(Sala* raiz);
-
-/** @brief Limpa o buffer de entrada para evitar erros no scanf. */
+void liberarPistas(PistaNode* raiz);
 void limparBufferEntrada();
-
-/** @brief Limpa o terminal (compatível com Windows e Linux). */
 void limparTela();
 
 // ============================================================================
@@ -65,37 +76,37 @@ void limparTela();
 // ============================================================================
 
 /**
- * @brief Função principal do programa.
+ * @brief Ponto de entrada principal do programa.
  *
- * Monta automaticamente a estrutura fixa da mansão (árvore binária)
- * e inicia a exploração a partir do Hall de Entrada.
+ * Constrói a estrutura fixa da mansão com pistas,
+ * inicia a exploração interativa e exibe as pistas coletadas.
  *
- * @return int Código de status do programa (0 = sucesso, 1 = erro).
+ * @return int Código de status (0 = sucesso).
  */
 int main() {
     setlocale(LC_ALL, "Portuguese");
 
     limparTela();
     printf("==============================================\n");
-    printf("       DETECTIVE QUEST - MANSÃO INTERATIVA     \n");
+    printf("   DETECTIVE QUEST - COLETA DE PISTAS (NÍVEL AVENTUREIRO)\n");
     printf("==============================================\n\n");
 
     // ------------------------------------------------------------------------
-    // Estrutura fixa da mansão (criada manualmente)
+    // Estrutura fixa da mansão com pistas
     //
-    //                  [Hall de Entrada]
-    //                     /         \
-    //          [Biblioteca]         [Cozinha]
-    //            /     \               \
-    //   [Estudo]     [Jardim]       [Sótão]
+    //                     [Hall de Entrada]
+    //                       /          \
+    //           [Biblioteca]            [Cozinha]
+    //              /     \                   \
+    //     [Estudo]     [Jardim]            [Sótão]
     // ------------------------------------------------------------------------
 
-    Sala* hall       = criarSala("Hall de Entrada");
-    Sala* biblioteca = criarSala("Biblioteca");
-    Sala* cozinha    = criarSala("Cozinha");
-    Sala* estudo     = criarSala("Sala de Estudo");
-    Sala* jardim     = criarSala("Jardim");
-    Sala* sotao      = criarSala("Sótão");
+    Sala* hall       = criarSala("Hall de Entrada", "Pegadas de lama recentes");
+    Sala* biblioteca = criarSala("Biblioteca", "Página arrancada de um diário");
+    Sala* cozinha    = criarSala("Cozinha", "Copo quebrado com marca de batom");
+    Sala* estudo     = criarSala("Sala de Estudo", "Envelope selado com cera vermelha");
+    Sala* jardim     = criarSala("Jardim", "Chave antiga caída entre as flores");
+    Sala* sotao      = criarSala("Sótão", "Retrato rasgado de uma mulher desconhecida");
 
     hall->esquerda       = biblioteca;
     hall->direita        = cozinha;
@@ -103,26 +114,39 @@ int main() {
     biblioteca->direita  = jardim;
     cozinha->direita     = sotao;
 
-    // Inicia a exploração
-    explorarSalas(hall);
+    // Raiz da árvore de pistas
+    PistaNode* raizPistas = NULL;
+
+    // Inicia a exploração da mansão
+    explorarSalasComPistas(hall, &raizPistas);
+
+    // Exibe todas as pistas coletadas em ordem alfabética
+    limparTela();
+    printf("==============================================\n");
+    printf("          PISTAS COLETADAS (ORDENADAS)\n");
+    printf("==============================================\n\n");
+    exibirPistas(raizPistas);
 
     // Libera memória
     liberarMansao(hall);
+    liberarPistas(raizPistas);
 
-    printf("\nExploração encerrada. Obrigado por jogar Detective Quest!\n");
+    printf("\nExploração encerrada. Mistério quase resolvido!\n");
     return 0;
 }
 
 // ============================================================================
-//                         IMPLEMENTAÇÃO DAS FUNÇÕES
+//                      IMPLEMENTAÇÃO DAS FUNÇÕES PRINCIPAIS
 // ============================================================================
 
 /**
- * @brief Cria uma sala de forma dinâmica e inicializa seus ponteiros.
- * @param nome Nome do cômodo a ser criado.
- * @return Ponteiro para a sala recém-criada.
+ * @brief Cria dinamicamente um cômodo com ou sem pista.
+ *
+ * @param nome Nome do cômodo.
+ * @param pista Texto da pista associada (pode ser vazio).
+ * @return Ponteiro para a sala criada.
  */
-Sala* criarSala(const char* nome) {
+Sala* criarSala(const char* nome, const char* pista) {
     Sala* nova = (Sala*) malloc(sizeof(Sala));
     if (!nova) {
         printf("Erro: falha ao alocar memória para a sala '%s'!\n", nome);
@@ -130,24 +154,52 @@ Sala* criarSala(const char* nome) {
     }
 
     strcpy(nova->nome, nome);
+    strcpy(nova->pista, pista ? pista : "");
     nova->esquerda = NULL;
     nova->direita  = NULL;
-
     return nova;
 }
 
 /**
- * @brief Permite ao jogador explorar as salas da mansão.
+ * @brief Insere uma nova pista na árvore de pistas (BST).
  *
- * A exploração começa no Hall de Entrada e segue conforme
- * as escolhas do jogador: esquerda (e), direita (d) ou sair (s).
+ * As pistas são organizadas alfabeticamente.
  *
- * Quando o jogador chega a uma sala sem saídas, o programa finaliza
- * automaticamente a exploração.
- *
- * @param atual Ponteiro para a sala inicial (raiz da árvore).
+ * @param raiz Ponteiro para a raiz da árvore.
+ * @param pista Texto da pista a ser inserida.
+ * @return Ponteiro atualizado para a raiz da árvore.
  */
-void explorarSalas(Sala* atual) {
+PistaNode* inserirPista(PistaNode* raiz, const char* pista) {
+    if (raiz == NULL) {
+        PistaNode* novo = (PistaNode*) malloc(sizeof(PistaNode));
+        if (!novo) {
+            printf("Erro: falha ao alocar memória para a pista!\n");
+            exit(EXIT_FAILURE);
+        }
+        strcpy(novo->pista, pista);
+        novo->esquerda = novo->direita = NULL;
+        return novo;
+    }
+
+    if (strcmp(pista, raiz->pista) < 0)
+        raiz->esquerda = inserirPista(raiz->esquerda, pista);
+    else if (strcmp(pista, raiz->pista) > 0)
+        raiz->direita = inserirPista(raiz->direita, pista);
+
+    return raiz;
+}
+
+/**
+ * @brief Controla a exploração das salas e coleta de pistas.
+ *
+ * O jogador escolhe entre esquerda (e), direita (d) ou sair (s).
+ * A cada sala visitada, sua pista é coletada automaticamente
+ * e adicionada à árvore de pistas.
+ *
+ * @param atual Ponteiro para a sala inicial (raiz da mansão).
+ * @param raizPistas Endereço do ponteiro raiz da BST de pistas.
+ */
+void explorarSalasComPistas(Sala* atual, PistaNode** raizPistas) {
     char opcao;
 
     while (atual != NULL) {
@@ -156,9 +208,11 @@ void explorarSalas(Sala* atual) {
         printf("Você está na sala: %s\n", atual->nome);
         printf("==============================================\n");
 
-        if (!atual->esquerda && !atual->direita) {
-            printf("\nVocê chegou ao fim da exploração!\n");
-            return;
+        if (strlen(atual->pista) > 0) {
+            printf("Pista encontrada: \"%s\"\n", atual->pista);
+            *raizPistas = inserirPista(*raizPistas, atual->pista);
+        } else {
+            printf("Nenhuma pista encontrada aqui.\n");
         }
 
         printf("\nEscolha o caminho:\n");
@@ -191,14 +245,42 @@ void explorarSalas(Sala* atual) {
 }
 
 /**
- * @brief Libera recursivamente toda a memória alocada para a mansão.
- * @param raiz Ponteiro para a sala raiz da árvore (Hall de Entrada).
+ * @brief Exibe as pistas armazenadas na BST em ordem alfabética.
+ *
+ * Implementa percurso in-order recursivo.
+ *
+ * @param raiz Ponteiro para a raiz da árvore de pistas.
+ */
+void exibirPistas(PistaNode* raiz) {
+    if (raiz == NULL) return;
+    exibirPistas(raiz->esquerda);
+    printf("- %s\n", raiz->pista);
+    exibirPistas(raiz->direita);
+}
+
+// ============================================================================
+//                           FUNÇÕES AUXILIARES
+// ============================================================================
+
+/**
+ * @brief Libera toda a memória da árvore de salas (mansão).
+ * @param raiz Ponteiro para a raiz da árvore binária.
  */
 void liberarMansao(Sala* raiz) {
-    if (raiz == NULL) return;
-
+    if (!raiz) return;
     liberarMansao(raiz->esquerda);
     liberarMansao(raiz->direita);
+    free(raiz);
+}
+
+/**
+ * @brief Libera toda a memória da árvore BST de pistas.
+ * @param raiz Ponteiro para a raiz da árvore BST.
+ */
+void liberarPistas(PistaNode* raiz) {
+    if (!raiz) return;
+    liberarPistas(raiz->esquerda);
+    liberarPistas(raiz->direita);
     free(raiz);
 }
 
